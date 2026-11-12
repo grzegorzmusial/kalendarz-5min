@@ -86,6 +86,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('Synchronizacja jest wyłączona'), findsNothing);
+      expect(find.text('Kalendarz Google'), findsNothing);
       final first = find.text('Spotkanie A');
       final second = find.text('Spotkanie B');
       expect(first, findsOneWidget);

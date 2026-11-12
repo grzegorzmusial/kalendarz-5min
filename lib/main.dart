@@ -233,9 +233,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final calendars = _data?.calendars ?? [];
     final canAdd = !_failed && !_loading && _writable.isNotEmpty;
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kalendarz 5 min'),
@@ -273,32 +271,6 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
         child: Column(
           children: [
             _WeekHeader(day: _day, onSelect: _select, onPickDate: _pickDate),
-            if (calendars.isNotEmpty)
-              Material(
-                color: colors.surfaceContainer,
-                child: InkWell(
-                  onTap: _settings,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 9,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.sync, size: 17),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Kalendarz Google',
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             Expanded(child: _body()),
           ],
         ),
