@@ -54,7 +54,7 @@ void main() {
                       'account': 'test@example.com',
                       'color': 0xff7656bc,
                       'writable': true,
-                      'sync': true,
+                      'sync': false,
                     },
                   ],
                   'events': [
@@ -85,6 +85,7 @@ void main() {
       await tester.pumpWidget(const CalendarApp());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      expect(find.text('Synchronizacja jest wyłączona'), findsNothing);
       final first = find.text('Spotkanie A');
       final second = find.text('Spotkanie B');
       expect(first, findsOneWidget);

@@ -235,7 +235,6 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final calendars = _data?.calendars ?? [];
     final canAdd = !_failed && !_loading && _writable.isNotEmpty;
-    final syncEnabled = calendars.every((calendar) => calendar.sync);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
@@ -276,9 +275,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
             _WeekHeader(day: _day, onSelect: _select, onPickDate: _pickDate),
             if (calendars.isNotEmpty)
               Material(
-                color: syncEnabled
-                    ? colors.surfaceContainer
-                    : colors.tertiaryContainer,
+                color: colors.surfaceContainer,
                 child: InkWell(
                   onTap: _settings,
                   child: Padding(
@@ -288,16 +285,11 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          syncEnabled ? Icons.sync : Icons.sync_disabled,
-                          size: 17,
-                        ),
+                        const Icon(Icons.sync, size: 17),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            syncEnabled
-                                ? 'Kalendarz Google'
-                                : 'Synchronizacja jest wyłączona',
+                            'Kalendarz Google',
                             style: Theme.of(context).textTheme.labelMedium,
                           ),
                         ),

@@ -1,7 +1,6 @@
 package pl.grzegorzmusial.kalendarz_5min
 
 import android.Manifest
-import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Intent
@@ -143,11 +142,7 @@ class MainActivity : FlutterActivity() {
                     "account" to account,
                     "color" to cursor.long(Calendars.CALENDAR_COLOR),
                     "primary" to cursor.flag(Calendars.IS_PRIMARY),
-                    "writable" to (cursor.long(Calendars.CALENDAR_ACCESS_LEVEL) >= Calendars.CAL_ACCESS_CONTRIBUTOR),
-                    "sync" to (ContentResolver.getMasterSyncAutomatically() &&
-                        ContentResolver.getSyncAutomatically(
-                            android.accounts.Account(account, "com.google"), "com.android.calendar"
-                        ))
+                    "writable" to (cursor.long(Calendars.CALENDAR_ACCESS_LEVEL) >= Calendars.CAL_ACCESS_CONTRIBUTOR)
                 ))
             }
         }

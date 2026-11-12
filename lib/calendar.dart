@@ -44,15 +44,13 @@ class GoogleCalendar {
       name = row['name'] as String,
       account = row['account'] as String,
       color = row['color'] as int,
-      writable = row['writable'] as bool,
-      sync = row['sync'] as bool;
+      writable = row['writable'] as bool;
 
   final int id;
   final String name;
   final String account;
   final int color;
   final bool writable;
-  final bool sync;
 
   String get label =>
       name.isEmpty || name == account ? account : '$name · $account';
