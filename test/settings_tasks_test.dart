@@ -7,10 +7,71 @@ import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:kalendarz_5min/main.dart';
 import 'package:kalendarz_5min/tasks.dart';
+import 'package:kalendarz_5min/calendar.dart';
+import 'package:kalendarz_5min/new_item_editor.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('calendar/android');
+
+  test(
+    'saved OAuth configuration takes precedence over the bundled client',
+    () async {
+      var configured = 'manual-client';
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async => configured);
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      expect(await CalendarStore().taskClientId(), 'manual-client');
+      configured = '';
+      expect(
+        await CalendarStore().taskClientId(),
+        const String.fromEnvironment('GOOGLE_TASKS_CLIENT_ID'),
+      );
+    },
+  );
+
+  testWidgets('inline type switch preserves the event draft', (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(channel, (call) async => null);
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    final calendar = GoogleCalendar({
+      'id': 1,
+      'name': 'Osobisty',
+      'account': 'test@example.com',
+      'color': 0xff7656bc,
+      'writable': true,
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NewItemEditor(
+          store: CalendarStore(),
+          calendars: [calendar],
+          calendarId: 1,
+          start: DateTime(2026, 11, 21, 9, 25),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Nowe wydarzenie'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).first, 'Mój wpis');
+    await tester.tap(find.byTooltip('Wydłuż o 5 minut'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zadanie'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nowe zadanie'), findsOneWidget);
+    expect(find.text('Konfiguruj dostęp'), findsOneWidget);
+    await tester.tap(find.text('Wydarzenie'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mój wpis'), findsOneWidget);
+    expect(find.text('09:25'), findsOneWidget);
+    final duration = tester.widget<TextFormField>(
+      find.byType(TextFormField).at(1),
+    );
+    expect(duration.controller!.text, '10');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('default calendar survives reopening and one-off overrides', (
     tester,
@@ -63,8 +124,6 @@ void main() {
     await tester.pumpAndSettle();
     Future<void> openEvent() async {
       await tester.tap(find.byTooltip('Dodaj wydarzenie lub zadanie'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Wydarzenie'));
       await tester.pumpAndSettle();
     }
 

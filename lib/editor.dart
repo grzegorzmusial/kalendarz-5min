@@ -11,6 +11,9 @@ class EventEditor extends StatefulWidget {
     required this.calendarId,
     required this.start,
     this.event,
+    this.typeSelector,
+    this.titleController,
+    this.onSavingChanged,
   });
 
   final CalendarStore store;
@@ -18,6 +21,9 @@ class EventEditor extends StatefulWidget {
   final int calendarId;
   final DateTime start;
   final CalendarEvent? event;
+  final Widget? typeSelector;
+  final TextEditingController? titleController;
+  final ValueChanged<bool>? onSavingChanged;
 
   @override
   State<EventEditor> createState() => _EventEditorState();
@@ -25,7 +31,9 @@ class EventEditor extends StatefulWidget {
 
 class _EventEditorState extends State<EventEditor> {
   final _form = GlobalKey<FormState>();
-  late final _title = TextEditingController(text: widget.event?.title ?? '');
+  late final _title =
+      widget.titleController ??
+      TextEditingController(text: widget.event?.title ?? '');
   late final _duration = TextEditingController(text: '$_originalMinutes');
   late int _calendarId = widget.calendarId;
   late DateTime _start = widget.start;
@@ -55,7 +63,7 @@ class _EventEditorState extends State<EventEditor> {
 
   @override
   void dispose() {
-    _title.dispose();
+    if (widget.titleController == null) _title.dispose();
     _duration.dispose();
     super.dispose();
   }
@@ -81,6 +89,7 @@ class _EventEditorState extends State<EventEditor> {
       _saving = true;
       _error = null;
     });
+    widget.onSavingChanged?.call(true);
     try {
       await widget.store.save(
         calendarId: _calendarId,
@@ -94,6 +103,7 @@ class _EventEditorState extends State<EventEditor> {
       }
     } on PlatformException {
       if (mounted) {
+        widget.onSavingChanged?.call(false);
         setState(() {
           _saving = false;
           _error =
@@ -127,8 +137,18 @@ class _EventEditorState extends State<EventEditor> {
       canPop: !_saving,
       child: AlertDialog(
         scrollable: true,
-        title: Text(
-          widget.event == null ? 'Nowe wydarzenie' : 'Edytuj wydarzenie',
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.event == null ? 'Nowe wydarzenie' : 'Edytuj wydarzenie',
+            ),
+            if (widget.typeSelector != null) ...[
+              const SizedBox(height: 12),
+              widget.typeSelector!,
+            ],
+          ],
         ),
         content: SizedBox(
           width: 380,
@@ -224,7 +244,7 @@ class _EventEditorState extends State<EventEditor> {
                     if (endLabel != null) Text('Koniec o $endLabel'),
                   ],
                 ),
-                if (widget.event == null) ...[
+                if (widget.event == null && widget.calendars.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
                     isExpanded: true,
@@ -247,6 +267,8 @@ class _EventEditorState extends State<EventEditor> {
                         : (value) => setState(() => _calendarId = value!),
                   ),
                 ],
+                if (widget.calendars.isEmpty)
+                  const Text('Włącz kalendarz Google z prawem zapisu.'),
                 if (widget.event?.recurring == true)
                   const Text('Zmiana dotyczy tego wystąpienia.'),
                 if (_error != null)
@@ -266,7 +288,7 @@ class _EventEditorState extends State<EventEditor> {
             child: const Text('Anuluj'),
           ),
           FilledButton(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving || widget.calendars.isEmpty ? null : _save,
             child: Text(_saving ? 'Zapisywanie…' : 'Zapisz'),
           ),
         ],

@@ -351,19 +351,27 @@ class TaskEditor extends StatefulWidget {
     required this.listId,
     required this.date,
     this.task,
+    this.typeSelector,
+    this.titleController,
+    this.onSavingChanged,
   });
   final TasksApi api;
   final List<GoogleTaskList> lists;
   final String listId;
   final DateTime date;
   final GoogleTask? task;
+  final Widget? typeSelector;
+  final TextEditingController? titleController;
+  final ValueChanged<bool>? onSavingChanged;
   @override
   State<TaskEditor> createState() => _TaskEditorState();
 }
 
 class _TaskEditorState extends State<TaskEditor> {
   final _form = GlobalKey<FormState>();
-  late final _title = TextEditingController(text: widget.task?.title ?? '');
+  late final _title =
+      widget.titleController ??
+      TextEditingController(text: widget.task?.title ?? '');
   late final _notes = TextEditingController(text: widget.task?.notes ?? '');
   late String _listId = widget.listId;
   late DateTime? _due = widget.task == null ? widget.date : widget.task!.due;
@@ -372,7 +380,7 @@ class _TaskEditorState extends State<TaskEditor> {
 
   @override
   void dispose() {
-    _title.dispose();
+    if (widget.titleController == null) _title.dispose();
     _notes.dispose();
     super.dispose();
   }
@@ -383,6 +391,7 @@ class _TaskEditorState extends State<TaskEditor> {
       _saving = true;
       _error = null;
     });
+    widget.onSavingChanged?.call(true);
     try {
       await widget.api.save(
         listId: _listId,
@@ -394,6 +403,7 @@ class _TaskEditorState extends State<TaskEditor> {
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (!mounted) return;
+      widget.onSavingChanged?.call(false);
       setState(() {
         _saving = false;
         _error = tasksError(error);
@@ -408,7 +418,17 @@ class _TaskEditorState extends State<TaskEditor> {
       canPop: !_saving,
       child: AlertDialog(
         scrollable: true,
-        title: Text(widget.task == null ? 'Nowe zadanie' : 'Edytuj zadanie'),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.task == null ? 'Nowe zadanie' : 'Edytuj zadanie'),
+            if (widget.typeSelector != null) ...[
+              const SizedBox(height: 12),
+              widget.typeSelector!,
+            ],
+          ],
+        ),
         content: SizedBox(
           width: 380,
           child: Form(

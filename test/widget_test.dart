@@ -123,8 +123,6 @@ void main() {
       await tester.tap(find.byTooltip('Dodaj wydarzenie lub zadanie'));
       await tester.pumpAndSettle();
       expect(find.text('Zadanie'), findsOneWidget);
-      await tester.tap(find.text('Wydarzenie'));
-      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).first, 'Przerwa');
       await tester.tap(find.text('Zapisz'));
       await tester.pumpAndSettle();

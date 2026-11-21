@@ -143,8 +143,11 @@ class CalendarStore {
   Future<int?> defaultCalendar() =>
       _channel.invokeMethod<int>('defaultCalendar');
 
-  Future<String> taskClientId() async =>
-      await _channel.invokeMethod<String>('taskClientId') ?? '';
+  Future<String> taskClientId() async {
+    final configured = await _channel.invokeMethod<String>('taskClientId');
+    if (configured != null && configured.trim().isNotEmpty) return configured;
+    return const String.fromEnvironment('GOOGLE_TASKS_CLIENT_ID');
+  }
 
   Future<void> setTaskClientId(String clientId) =>
       _channel.invokeMethod<void>('setTaskClientId', {'clientId': clientId});

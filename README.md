@@ -21,12 +21,14 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run
-flutter build apk --release
+flutter build apk --release --dart-define-from-file=config/google_tasks.json
 ```
 
 Gotowy pakiet znajduje się w `build/app/outputs/flutter-apk/app-release.apk`. Lokalna kompilacja używa klucza deweloperskiego. Dystrybucja przez Google Play wymaga własnego klucza wydania.
 
 ## Domyślny kalendarz i Zadania Google
+
+Dołączony APK ma wbudowany identyfikator klienta OAuth z pliku config/google_tasks.json. Google Tasks API, klienci Android i Web oraz zakres dostępu są skonfigurowane w projekcie My First Project (project-22e2e5bd-3a7c-48f9-bc1). Aplikacja jest w trybie testowym z kontem grzegorz.musial.1980@gmail.com dodanym jako użytkownik testowy. W aplikacji wybierz „Połącz konto Google”, aby nadać dostęp do zadań.
 
 Kalendarz 5 min — Zadania Google
 
@@ -34,11 +36,11 @@ Domyślny kalendarz
 W menu pod trzema kropkami wybierz „Domyślny kalendarz”, a następnie kalendarz do zapisywania nowych wydarzeń. Wybór jest pamiętany po zamknięciu aplikacji. Możesz jednorazowo wybrać inny kalendarz w formularzu nowego wydarzenia.
 
 Wydarzenia i zadania
-Przycisk „+” oraz dotknięcie osi czasu otwierają wybór „Wydarzenie” lub „Zadanie”. Zadania są zapisywane na wybranej liście Google Tasks, tej samej, którą widzisz na https://tasks.google.com/. Widok zadań otworzysz również z menu „Zadania Google”. Widok pokazuje wszystkie zadania z wybranej listy. Nowe zadanie domyślnie otrzymuje datę wybraną w kalendarzu. Możesz zmienić lub usunąć datę.
+Przycisk „+” oraz dotknięcie osi czasu otwierają od razu formularz. Przełącznik „Wydarzenie / Zadanie” znajduje się u góry tego formularza i zachowuje wpisany tytuł podczas zmiany typu. Zadania są zapisywane na wybranej liście Google Tasks, tej samej, którą widzisz na https://tasks.google.com/. Widok zadań otworzysz również z menu „Zadania Google”. Widok pokazuje wszystkie zadania z wybranej listy. Nowe zadanie domyślnie otrzymuje datę wybraną w kalendarzu. Możesz zmienić lub usunąć datę.
 
 Zadania Google wymagają osobnego połączenia z kontem Google. API Google Tasks udostępnia datę zadania i pomija godzinę. Zadania są wyświetlane na liście i można je oznaczyć jako wykonane.
 
-Jednorazowa konfiguracja Google Cloud
+Odtworzenie konfiguracji Google Cloud
 1. Otwórz https://console.cloud.google.com/ i wybierz lub utwórz projekt.
 2. Włącz Google Tasks API dla tego projektu.
    https://console.cloud.google.com/apis/library/tasks.googleapis.com

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'calendar.dart';
 import 'editor.dart';
+import 'new_item_editor.dart';
 import 'timeline.dart';
 import 'tasks_screen.dart';
 
@@ -201,55 +202,40 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _add([DateTime? start]) {
+  Future<void> _create([DateTime? start]) async {
     final writable = _writable;
-    if (writable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Włącz kalendarz Google z prawem zapisu.'),
-        ),
-      );
-      return;
-    }
     final now = DateTime.now();
     final minutes = dateOnly(now) == _day
         ? slotAt(_day, now.difference(_day).inMinutes.toDouble())
         : 8 * 60;
     start ??= _day.add(Duration(minutes: minutes));
-    final selected = writable.where(
-      (calendar) => calendar.id == _defaultCalendarId,
-    );
-    _openEditor(start, selected.firstOrNull ?? writable.first);
-  }
-
-  Future<void> _create([DateTime? start]) async {
-    final type = await showModalBottomSheet<String>(
+    final calendar =
+        writable
+            .where((calendar) => calendar.id == _defaultCalendarId)
+            .firstOrNull ??
+        writable.firstOrNull;
+    final saved = await showDialog<Object>(
       context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.event_outlined),
-              title: const Text('Wydarzenie'),
-              onTap: () => Navigator.pop(context, 'event'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.check_box_outlined),
-              title: const Text('Zadanie'),
-              onTap: () => Navigator.pop(context, 'task'),
-            ),
-          ],
+      barrierDismissible: false,
+      builder: (_) => NewItemEditor(
+        store: _store,
+        calendars: writable,
+        calendarId: calendar?.id ?? -1,
+        start: start!,
+      ),
+    );
+    if (!mounted || saved == null) return;
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved == true
+              ? 'Zapisano zadanie w Google.'
+              : 'Zapisano w kalendarzu Google na urządzeniu.',
         ),
       ),
     );
-    if (!mounted) return;
-    if (type == 'event') {
-      _add(start);
-    } else if (type == 'task') {
-      await _openTasks(createNew: true);
-    }
   }
 
   Future<void> _openTasks({bool createNew = false}) => Navigator.push<void>(
