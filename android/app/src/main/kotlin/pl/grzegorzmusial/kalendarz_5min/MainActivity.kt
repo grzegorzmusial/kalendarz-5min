@@ -45,6 +45,23 @@ class MainActivity : FlutterActivity() {
                     reply.success(hasPermission())
                 }
                 "requestPermission" -> requestAccess(reply)
+                "taskClientId" -> reply.success(
+                    getSharedPreferences("calendar_settings", MODE_PRIVATE)
+                        .getString("tasks_client_id", "")
+                )
+                "setTaskClientId" -> worker.execute {
+                    val clientId = call.argument<String>("clientId").orEmpty().trim()
+                    val saved = getSharedPreferences("calendar_settings", MODE_PRIVATE)
+                        .edit().putString("tasks_client_id", clientId).commit()
+                    runOnUiThread {
+                        if (saved) reply.success(null) else reply.error("settings", null, null)
+                    }
+                }
+                "defaultCalendar" -> {
+                    val preferences = getSharedPreferences("calendar_settings", MODE_PRIVATE)
+                    val id = preferences.getLong("default_calendar_id", -1L)
+                    reply.success(if (id == -1L) null else id)
+                }
                 "settings" -> {
                     startActivity(Intent(Settings.ACTION_SYNC_SETTINGS))
                     reply.success(null)
@@ -55,11 +72,17 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                     reply.success(null)
                 }
-                "day", "save" -> worker.execute {
+                "day", "save", "setDefaultCalendar" -> worker.execute {
                     try {
                         if (!hasPermission()) throw SecurityException()
                         val value = if (call.method == "day") {
                             readDay(call)
+                        } else if (call.method == "setDefaultCalendar") {
+                            val id = call.number("calendarId")
+                            check(googleCalendars().any { it["id"] == id && it["writable"] == true })
+                            check(getSharedPreferences("calendar_settings", MODE_PRIVATE)
+                                .edit().putLong("default_calendar_id", id).commit())
+                            null
                         } else {
                             save(call)
                             null

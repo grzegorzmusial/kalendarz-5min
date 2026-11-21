@@ -93,6 +93,18 @@ class CalendarEvent {
   final bool canModify;
   final int? color;
 
+  CalendarEvent withTimes(DateTime start, DateTime end) => CalendarEvent(
+    id: id,
+    calendarId: calendarId,
+    title: title,
+    start: start,
+    end: end,
+    allDay: allDay,
+    recurring: recurring,
+    canModify: canModify,
+    color: color,
+  );
+
   String get label => title.trim().isEmpty ? 'Bez tytułu' : title;
 }
 
@@ -127,6 +139,18 @@ class CalendarStore {
 
   Future<void> openSettings({bool permissions = false}) =>
       _channel.invokeMethod<void>(permissions ? 'appSettings' : 'settings');
+
+  Future<int?> defaultCalendar() =>
+      _channel.invokeMethod<int>('defaultCalendar');
+
+  Future<String> taskClientId() async =>
+      await _channel.invokeMethod<String>('taskClientId') ?? '';
+
+  Future<void> setTaskClientId(String clientId) =>
+      _channel.invokeMethod<void>('setTaskClientId', {'clientId': clientId});
+
+  Future<void> setDefaultCalendar(int calendarId) => _channel
+      .invokeMethod<void>('setDefaultCalendar', {'calendarId': calendarId});
 
   Future<CalendarDay> readDay(DateTime date) async {
     final result = await _channel.invokeMapMethod<String, List<Object?>>(

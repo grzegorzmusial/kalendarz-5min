@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kalendarz_5min/calendar.dart';
 import 'package:kalendarz_5min/main.dart';
+import 'package:kalendarz_5min/timeline.dart';
 
 void main() {
   const channel = MethodChannel('calendar/android');
@@ -106,7 +107,23 @@ void main() {
       expect(payloads.single['start'], onScreen.millisecondsSinceEpoch);
       expect(payloads.single['end'], onScreen.millisecondsSinceEpoch + 300000);
 
-      await tester.tap(find.byTooltip('Dodaj wydarzenie'));
+      final timelineScroll = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(Timeline),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      timelineScroll.jumpTo(timelineScroll.pixels + 400);
+      await tester.pumpAndSettle();
+      final offsetBeforeAdding = timelineScroll.pixels;
+      await tester.tap(find.byTooltip('Dodaj wydarzenie lub zadanie'));
+      await tester.pumpAndSettle();
+      expect(find.text('Zadanie'), findsOneWidget);
+      await tester.tap(find.text('Wydarzenie'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).first, 'Przerwa');
       await tester.tap(find.text('Zapisz'));
@@ -115,6 +132,18 @@ void main() {
       final newStart = payloads.last['start']! as int;
       expect(newStart % 300000, 0);
       expect(payloads.last['end'], newStart + 300000);
+      final offsetAfterAdding = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(Timeline),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position
+          .pixels;
+      expect(offsetAfterAdding, offsetBeforeAdding);
       expect(tester.takeException(), isNull);
     },
   );

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'calendar.dart';
 import 'editor.dart';
 import 'timeline.dart';
+import 'tasks_screen.dart';
 
 void main() => runApp(const CalendarApp());
 
@@ -52,7 +53,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
   CalendarDay? _data;
   Timer? _refreshTimer;
   int _loadId = 0;
-  int? _calendarId;
+  int? _defaultCalendarId;
   bool _loading = true;
   bool _denied = false;
   bool _failed = false;
@@ -85,6 +86,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     final loadId = ++_loadId;
     final day = _day;
     try {
+      final defaultCalendarId = await _store.defaultCalendar();
       final allowed = request
           ? await _store.requestPermission()
           : await _store.hasPermission();
@@ -92,6 +94,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       if (!mounted || loadId != _loadId) return;
       setState(() {
         _data = data;
+        _defaultCalendarId = defaultCalendarId;
         _denied = !allowed;
         _failed = false;
         _loading = false;
@@ -105,9 +108,9 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _select(DateTime day, {bool force = false}) {
+  void _select(DateTime day) {
     day = dateOnly(day);
-    if (_day == day && !force) return;
+    if (_day == day) return;
     setState(() {
       _day = day;
       _data = null;
@@ -144,6 +147,60 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
   List<GoogleCalendar> get _writable =>
       _data?.calendars.where((calendar) => calendar.writable).toList() ?? [];
 
+  Future<void> _chooseDefaultCalendar() async {
+    final calendars = _writable;
+    if (calendars.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Włącz kalendarz Google z prawem zapisu.'),
+        ),
+      );
+      return;
+    }
+    final selected =
+        calendars.any((calendar) => calendar.id == _defaultCalendarId)
+        ? _defaultCalendarId
+        : calendars.first.id;
+    final choice = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Domyślny kalendarz'),
+        children: [
+          for (final calendar in calendars)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, calendar.id),
+              child: Row(
+                children: [
+                  Icon(
+                    calendar.id == selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(calendar.label)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    try {
+      await _store.setDefaultCalendar(choice);
+      if (!mounted) return;
+      ++_loadId;
+      setState(() => _defaultCalendarId = choice);
+      await _load();
+    } on PlatformException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nie udało się zapisać domyślnego kalendarza.'),
+        ),
+      );
+    }
+  }
+
   void _add([DateTime? start]) {
     final writable = _writable;
     if (writable.isEmpty) {
@@ -159,9 +216,48 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
         ? slotAt(_day, now.difference(_day).inMinutes.toDouble())
         : 8 * 60;
     start ??= _day.add(Duration(minutes: minutes));
-    final selected = writable.where((calendar) => calendar.id == _calendarId);
+    final selected = writable.where(
+      (calendar) => calendar.id == _defaultCalendarId,
+    );
     _openEditor(start, selected.firstOrNull ?? writable.first);
   }
+
+  Future<void> _create([DateTime? start]) async {
+    final type = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.event_outlined),
+              title: const Text('Wydarzenie'),
+              onTap: () => Navigator.pop(context, 'event'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.check_box_outlined),
+              title: const Text('Zadanie'),
+              onTap: () => Navigator.pop(context, 'task'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (type == 'event') {
+      _add(start);
+    } else if (type == 'task') {
+      await _openTasks(createNew: true);
+    }
+  }
+
+  Future<void> _openTasks({bool createNew = false}) => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => TasksScreen(date: _day, createNew: createNew),
+    ),
+  );
 
   Future<void> _openEditor(
     DateTime start,
@@ -180,12 +276,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       ),
     );
     if (!mounted || saved == null) return;
-    _calendarId = saved.calendarId;
-    if (event == null || dateOnly(event.start) == _day) {
-      _select(saved.start, force: true);
-    } else {
-      await _load();
-    }
+    await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -231,9 +322,36 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<bool> _reschedule(
+    CalendarEvent event,
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      await _store.save(
+        calendarId: event.calendarId,
+        title: event.title,
+        start: start,
+        end: end,
+        event: event,
+      );
+      if (mounted) await _load();
+      return true;
+    } on PlatformException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nie udało się zmienić godziny wydarzenia.'),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canAdd = !_failed && !_loading && _writable.isNotEmpty;
+    final canAdd = !_loading;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kalendarz 5 min'),
@@ -248,12 +366,27 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
             onSelected: (action) {
               if (action == 'refresh') {
                 _load();
+              } else if (action == 'defaultCalendar') {
+                _chooseDefaultCalendar();
+              } else if (action == 'tasks') {
+                _openTasks();
+              } else if (action == 'tasksConfig') {
+                configureTasks(context);
               } else {
                 _settings(permissions: action == 'permission');
               }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'refresh', child: Text('Odśwież')),
+              PopupMenuItem(value: 'tasks', child: Text('Zadania Google')),
+              PopupMenuItem(
+                value: 'tasksConfig',
+                child: Text('Dostęp do Zadań Google'),
+              ),
+              PopupMenuItem(
+                value: 'defaultCalendar',
+                child: Text('Domyślny kalendarz'),
+              ),
               PopupMenuItem(
                 value: 'sync',
                 child: Text('Ustawienia synchronizacji'),
@@ -277,8 +410,8 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       ),
       floatingActionButton: canAdd
           ? FloatingActionButton(
-              tooltip: 'Dodaj wydarzenie',
-              onPressed: _add,
+              tooltip: 'Dodaj wydarzenie lub zadanie',
+              onPressed: _create,
               child: const Icon(Icons.add),
             )
           : null,
@@ -332,8 +465,9 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       key: ValueKey(_day),
       day: _day,
       data: data,
-      onSlot: _add,
+      onSlot: _create,
       onEvent: _openEvent,
+      onReschedule: _reschedule,
     );
   }
 }

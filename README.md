@@ -25,3 +25,48 @@ flutter build apk --release
 ```
 
 Gotowy pakiet znajduje się w `build/app/outputs/flutter-apk/app-release.apk`. Lokalna kompilacja używa klucza deweloperskiego. Dystrybucja przez Google Play wymaga własnego klucza wydania.
+
+## Domyślny kalendarz i Zadania Google
+
+Kalendarz 5 min — Zadania Google
+
+Domyślny kalendarz
+W menu pod trzema kropkami wybierz „Domyślny kalendarz”, a następnie kalendarz do zapisywania nowych wydarzeń. Wybór jest pamiętany po zamknięciu aplikacji. Możesz jednorazowo wybrać inny kalendarz w formularzu nowego wydarzenia.
+
+Wydarzenia i zadania
+Przycisk „+” oraz dotknięcie osi czasu otwierają wybór „Wydarzenie” lub „Zadanie”. Zadania są zapisywane na wybranej liście Google Tasks, tej samej, którą widzisz na https://tasks.google.com/. Widok zadań otworzysz również z menu „Zadania Google”. Widok pokazuje wszystkie zadania z wybranej listy. Nowe zadanie domyślnie otrzymuje datę wybraną w kalendarzu. Możesz zmienić lub usunąć datę.
+
+Zadania Google wymagają osobnego połączenia z kontem Google. API Google Tasks udostępnia datę zadania i pomija godzinę. Zadania są wyświetlane na liście i można je oznaczyć jako wykonane.
+
+Jednorazowa konfiguracja Google Cloud
+1. Otwórz https://console.cloud.google.com/ i wybierz lub utwórz projekt.
+2. Włącz Google Tasks API dla tego projektu.
+   https://console.cloud.google.com/apis/library/tasks.googleapis.com
+3. W Google Auth Platform skonfiguruj ekran zgody. Przy prywatnym użyciu wybierz odbiorców zewnętrznych i tryb testowy, a następnie dodaj swój adres Google do użytkowników testowych.
+4. W sekcji Data Access dodaj zakres https://www.googleapis.com/auth/tasks.
+5. W sekcji Clients utwórz klienta OAuth typu Android z danymi poniżej.
+   Nazwa pakietu
+   pl.grzegorzmusial.kalendarz_5min
+   SHA-1 certyfikatu APK dołączonego do tej wersji
+   53:5B:48:CC:E2:FD:82:71:37:77:A4:7A:1C:1A:A4:81:CB:CE:70:32
+6. W tym samym projekcie utwórz drugiego klienta OAuth typu „Aplikacja internetowa” (Web application). Skopiuj jego identyfikator klienta, kończący się na .apps.googleusercontent.com.
+7. W aplikacji otwórz menu pod trzema kropkami → „Dostęp do Zadań Google”. Wklej identyfikator klienta webowego i zapisz.
+8. Otwórz „Zadania Google”, wybierz „Połącz konto Google” i udziel dostępu do zadań.
+
+Identyfikator klienta webowego jest publicznym identyfikatorem konfiguracji. Formularz wymaga tylko tego identyfikatora.
+Zmiana wcześniej używanego identyfikatora wymaga zamknięcia i ponownego uruchomienia aplikacji.
+Konfiguracja kalendarza systemowego i wybór domyślnego kalendarza działają od razu po przyznaniu dostępu do kalendarza.
+
+Weryfikacja
+Testy aplikacji sprawdzają domyślny kalendarz po ponownym otwarciu, jednorazowy wybór innego kalendarza, wycofanie niedostępnego kalendarza, żądania Google Tasks API, pobieranie kolejnych stron wyników i zmianę stanu wykonania.
+Połączenie z rzeczywistym kontem Google wymaga wykonania powyższej konfiguracji i zalogowania w aplikacji.
+
+Dokumentacja Google
+https://pub.dev/packages/google_sign_in_android
+https://developers.google.com/workspace/tasks/auth
+https://developers.google.com/tasks/reference/rest/v1/tasks
+
+
+## Przeciąganie wydarzeń
+
+Przytrzymaj wydarzenie, aby je przesunąć. Uchwyty na początku i końcu zmieniają godzinę rozpoczęcia i zakończenia w krokach co 5 minut. Oś przewija się automatycznie przy krawędziach ekranu. Zapis odświeża wydarzenia z zachowaniem dnia i pozycji przewinięcia.
