@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'calendar.dart';
 import 'tasks.dart';
+import 'time_fields.dart';
 
 Future<void> configureTasks(BuildContext context) async {
   final store = CalendarStore();
@@ -323,7 +324,10 @@ class _TasksScreenState extends State<TasksScreen> with WidgetsBindingObserver {
                           ),
                           subtitle: task.due == null
                               ? null
-                              : Text(locale.formatFullDate(task.due!)),
+                              : Text(
+                                  '${locale.formatFullDate(task.schedule?.start ?? task.due!)}'
+                                  '${task.schedule == null ? '' : ' · ${clock(task.schedule!.start)}–${clock(task.schedule!.end)}'}',
+                                ),
                           onTap: () => _edit(task),
                         );
                       },
@@ -354,6 +358,7 @@ class TaskEditor extends StatefulWidget {
     this.typeSelector,
     this.titleController,
     this.onSavingChanged,
+    this.initialStart,
   });
   final TasksApi api;
   final List<GoogleTaskList> lists;
@@ -363,6 +368,7 @@ class TaskEditor extends StatefulWidget {
   final Widget? typeSelector;
   final TextEditingController? titleController;
   final ValueChanged<bool>? onSavingChanged;
+  final DateTime? initialStart;
   @override
   State<TaskEditor> createState() => _TaskEditorState();
 }
@@ -374,7 +380,17 @@ class _TaskEditorState extends State<TaskEditor> {
       TextEditingController(text: widget.task?.title ?? '');
   late final _notes = TextEditingController(text: widget.task?.notes ?? '');
   late String _listId = widget.listId;
-  late DateTime? _due = widget.task == null ? widget.date : widget.task!.due;
+  late DateTime? _due = widget.task == null
+      ? dateOnly(widget.date)
+      : widget.task!.schedule == null
+      ? widget.task!.due
+      : dateOnly(widget.task!.schedule!.start);
+  late bool _timed = widget.task == null || widget.task!.schedule != null;
+  late DateTime _start = _initialStart();
+  late final _duration = TextEditingController(
+    text: '${widget.task?.schedule?.minutes ?? slotMinutes}',
+  );
+  bool _durationChanged = false;
   bool _saving = false;
   String? _error;
 
@@ -382,7 +398,29 @@ class _TaskEditorState extends State<TaskEditor> {
   void dispose() {
     if (widget.titleController == null) _title.dispose();
     _notes.dispose();
+    _duration.dispose();
     super.dispose();
+  }
+
+  DateTime _initialStart() {
+    if (widget.task?.schedule != null) return widget.task!.schedule!.start;
+    if (widget.initialStart != null) return widget.initialStart!;
+    final day = _due ?? dateOnly(widget.date);
+    final now = DateTime.now();
+    final minutes = dateOnly(now) == day
+        ? slotAt(day, now.difference(day).inMinutes.toDouble())
+        : 8 * 60;
+    return day.add(Duration(minutes: minutes));
+  }
+
+  DateTime? get _end {
+    final minutes = int.tryParse(_duration.text);
+    if (minutes == null || minutes < 1 || minutes > 5256000) return null;
+    final original = widget.task?.schedule;
+    if (!_durationChanged && original != null) {
+      return _start.add(original.duration);
+    }
+    return _start.add(Duration(minutes: minutes));
   }
 
   Future<void> _save() async {
@@ -399,6 +437,8 @@ class _TaskEditorState extends State<TaskEditor> {
         notes: _notes.text,
         due: _due,
         task: widget.task,
+        schedule: _timed && _due != null ? TaskSchedule(_start, _end!) : null,
+        removeSchedule: !_timed,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -493,7 +533,15 @@ class _TaskEditorState extends State<TaskEditor> {
                                 lastDate: DateTime(2199, 12, 31),
                               );
                               if (mounted && due != null) {
-                                setState(() => _due = due);
+                                setState(() {
+                                  _due = due;
+                                  _start = TaskSchedule(
+                                    _start,
+                                    _start.add(
+                                      const Duration(minutes: slotMinutes),
+                                    ),
+                                  ).onDate(due).start;
+                                });
                               }
                             },
                     ),
@@ -502,11 +550,36 @@ class _TaskEditorState extends State<TaskEditor> {
                         tooltip: 'Usuń datę',
                         onPressed: _saving
                             ? null
-                            : () => setState(() => _due = null),
+                            : () => setState(() {
+                                _due = null;
+                                _timed = false;
+                              }),
                         icon: const Icon(Icons.close),
                       ),
                   ],
                 ),
+                if (_due != null) ...[
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Godzina'),
+                    value: _timed,
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _timed = value),
+                  ),
+                  if (_timed)
+                    TimeFields(
+                      start: _start,
+                      end: _end,
+                      duration: _duration,
+                      enabled: !_saving,
+                      allowOriginalDuration:
+                          !_durationChanged && widget.task?.schedule != null,
+                      onStartChanged: (value) => setState(() => _start = value),
+                      onDurationChanged: () =>
+                          setState(() => _durationChanged = true),
+                    ),
+                ],
                 if (_error != null)
                   Text(
                     _error!,

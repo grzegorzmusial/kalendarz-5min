@@ -8,6 +8,7 @@ import 'editor.dart';
 import 'new_item_editor.dart';
 import 'timeline.dart';
 import 'tasks_screen.dart';
+import 'tasks.dart';
 
 void main() => runApp(const CalendarApp());
 
@@ -42,7 +43,8 @@ class CalendarApp extends StatelessWidget {
 }
 
 class DayScreen extends StatefulWidget {
-  const DayScreen({super.key});
+  const DayScreen({super.key, this.tasksApi});
+  final TasksApi? tasksApi;
 
   @override
   State<DayScreen> createState() => _DayScreenState();
@@ -50,6 +52,10 @@ class DayScreen extends StatefulWidget {
 
 class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
   final _store = CalendarStore();
+  late final _tasksApi =
+      widget.tasksApi ?? TasksApi(token: TasksAuth.instance.token);
+  List<GoogleTask> _scheduledTasks = [];
+  int _tasksRequest = 0;
   DateTime _day = dateOnly(DateTime.now());
   CalendarDay? _data;
   Timer? _refreshTimer;
@@ -67,23 +73,24 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       _refreshTimer?.cancel();
       _refreshTimer = Timer(const Duration(milliseconds: 200), _load);
     });
-    _load();
+    _load(reloadTasks: true);
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _store.onChange(null);
+    if (widget.tasksApi == null) _tasksApi.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _load();
+    if (state == AppLifecycleState.resumed) _load(reloadTasks: true);
   }
 
-  Future<void> _load({bool request = false}) async {
+  Future<void> _load({bool request = false, bool reloadTasks = false}) async {
     final loadId = ++_loadId;
     final day = _day;
     try {
@@ -107,7 +114,37 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
         _loading = false;
       });
     }
+    if (mounted && loadId == _loadId && reloadTasks) unawaited(_refreshTasks());
   }
+
+  Future<void> _refreshTasks({bool showErrors = false}) async {
+    final request = ++_tasksRequest;
+    try {
+      final tasks = await _tasksApi.scheduledTasks();
+      if (!mounted || request != _tasksRequest) return;
+      setState(() => _scheduledTasks = tasks);
+    } catch (error) {
+      if (!mounted || request != _tasksRequest) return;
+      if (TasksAuth.instance.email == null && widget.tasksApi == null) {
+        setState(() => _scheduledTasks = []);
+      }
+      if (showErrors) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(tasksError(error))));
+      }
+    }
+  }
+
+  List<CalendarEvent> get _taskEvents => _scheduledTasks
+      .where(
+        (task) =>
+            !task.completed &&
+            task.schedule != null &&
+            task.schedule!.start.isBefore(shiftDay(_day, 1)) &&
+            task.schedule!.end.isAfter(_day),
+      )
+      .map((task) => task.calendarEvent)
+      .toList();
 
   void _select(DateTime day) {
     day = dateOnly(day);
@@ -225,7 +262,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
       ),
     );
     if (!mounted || saved == null) return;
-    await _load();
+    await _load(reloadTasks: saved == true);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -238,12 +275,20 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _openTasks({bool createNew = false}) => Navigator.push<void>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => TasksScreen(date: _day, createNew: createNew),
-    ),
-  );
+  Future<void> _openTasks({bool createNew = false}) async {
+    final account = TasksAuth.instance.email;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TasksScreen(date: _day, createNew: createNew),
+      ),
+    );
+    if (!mounted) return;
+    if (account != TasksAuth.instance.email) {
+      setState(() => _scheduledTasks = []);
+    }
+    await _refreshTasks(showErrors: true);
+  }
 
   Future<void> _openEditor(
     DateTime start,
@@ -272,6 +317,10 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
   }
 
   void _openEvent(CalendarEvent event) {
+    if (event.taskId != null) {
+      _editTask(event);
+      return;
+    }
     final calendar = _data!.calendarFor(event);
     if (calendar.writable && event.canModify && !event.allDay) {
       _openEditor(event.start, calendar, event: event);
@@ -308,11 +357,65 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _editTask(CalendarEvent event) async {
+    try {
+      final task = await _tasksApi.task(event.taskListId!, event.taskId!);
+      if (!mounted) return;
+      final saved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => TaskEditor(
+          api: _tasksApi,
+          lists: const [],
+          listId: task.listId,
+          date: _day,
+          task: task,
+        ),
+      );
+      if (mounted && saved == true) await _refreshTasks(showErrors: true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(tasksError(error))));
+      }
+    }
+  }
+
   Future<bool> _reschedule(
     CalendarEvent event,
     DateTime start,
     DateTime end,
   ) async {
+    if (event.taskId != null) {
+      final task = _scheduledTasks
+          .where(
+            (task) =>
+                task.id == event.taskId && task.listId == event.taskListId,
+          )
+          .firstOrNull;
+      if (task == null) return false;
+      try {
+        final updated = await _tasksApi.reschedule(task, start, end);
+        if (mounted) {
+          setState(
+            () => _scheduledTasks = _scheduledTasks
+                .map(
+                  (item) => item.id == task.id && item.listId == task.listId
+                      ? updated
+                      : item,
+                )
+                .toList(),
+          );
+        }
+        return true;
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(tasksError(error))));
+        }
+        return false;
+      }
+    }
     try {
       await _store.save(
         calendarId: event.calendarId,
@@ -352,6 +455,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
             onSelected: (action) {
               if (action == 'refresh') {
                 _load();
+                _refreshTasks(showErrors: true);
               } else if (action == 'defaultCalendar') {
                 _chooseDefaultCalendar();
               } else if (action == 'tasks') {
@@ -406,7 +510,8 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
 
   Widget _body() {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_failed) {
+    final tasks = _taskEvents;
+    if (_failed && tasks.isEmpty) {
       return _CalendarMessage(
         icon: Icons.error_outline,
         title: 'Nie udało się odczytać kalendarza',
@@ -414,7 +519,7 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
         onPressed: _load,
       );
     }
-    if (_denied) {
+    if (_denied && tasks.isEmpty) {
       return _CalendarMessage(
         icon: Icons.calendar_month_outlined,
         title: 'Połącz kalendarz Google',
@@ -437,8 +542,11 @@ class _DayScreenState extends State<DayScreen> with WidgetsBindingObserver {
         },
       );
     }
-    final data = _data!;
-    if (data.calendars.isEmpty) {
+    final data = CalendarDay(_data?.calendars ?? [], [
+      ...?_data?.events,
+      ...tasks,
+    ]);
+    if (data.calendars.isEmpty && tasks.isEmpty) {
       return _CalendarMessage(
         icon: Icons.sync_problem,
         title: 'Dodaj konto Google',

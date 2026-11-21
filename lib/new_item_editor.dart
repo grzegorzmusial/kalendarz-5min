@@ -67,7 +67,7 @@ class _NewItemEditorState extends State<NewItemEditor> {
         ),
         if (_visitedTasks)
           _NewTaskEditor(
-            date: dateOnly(widget.start),
+            date: widget.start,
             selector: selector,
             title: _title,
             onSavingChanged: savingChanged,
@@ -143,6 +143,7 @@ class _NewTaskEditorState extends State<_NewTaskEditor> {
         lists: _lists,
         listId: _lists.first.id,
         date: widget.date,
+        initialStart: widget.date,
         typeSelector: widget.selector,
         titleController: widget.title,
         onSavingChanged: widget.onSavingChanged,

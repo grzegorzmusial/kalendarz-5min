@@ -67,6 +67,18 @@ class _TimelineState extends State<Timeline> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.data != widget.data) {
       _placements = placeEvents(widget.data.events, widget.day);
+      final selected = _selected;
+      if (selected != null && _gestureEvent == null && !_saving) {
+        final current = widget.data.events
+            .where((event) => event.identity == selected.identity)
+            .firstOrNull;
+        if (current == null ||
+            current.start != selected.start ||
+            current.end != selected.end) {
+          _selected = null;
+          _preview = null;
+        }
+      }
     }
   }
 
@@ -78,17 +90,21 @@ class _TimelineState extends State<Timeline> {
     super.dispose();
   }
 
-  Color _eventColor(CalendarEvent event) =>
-      Color(event.color ?? widget.data.calendarFor(event).color).withAlpha(255);
+  Color _eventColor(CalendarEvent event) => Color(
+    event.color ??
+        (event.taskId != null
+            ? 0xff277c55
+            : widget.data.calendarFor(event).color),
+  ).withAlpha(255);
 
   bool _isSelected(CalendarEvent event) =>
-      _selected?.id == event.id && _selected?.start == event.start;
+      _selected?.identity == event.identity;
 
   bool _canEdit(CalendarEvent event) =>
       !_saving &&
       !event.allDay &&
       event.canModify &&
-      widget.data.calendarFor(event).writable;
+      (event.taskId != null || widget.data.calendarFor(event).writable);
 
   void _startGesture(CalendarEvent event, Offset pointer, String kind) {
     if (!_canEdit(event)) return;
@@ -390,7 +406,7 @@ class _TimelineState extends State<Timeline> {
     final accent = _eventColor(event);
     final fill = Color.alphaBlend(accent.withAlpha(42), colors.surface);
     return Positioned(
-      key: ValueKey('${original.id}:${original.start.millisecondsSinceEpoch}'),
+      key: ValueKey(original.identity),
       left: placement.lane * laneWidth + 2,
       top: _topInset + visibleStart * _pixelsPerMinute + 1,
       width: laneWidth - 4,
@@ -433,7 +449,9 @@ class _TimelineState extends State<Timeline> {
                         children: [
                           Flexible(
                             child: Text(
-                              event.label,
+                              event.taskId == null
+                                  ? event.label
+                                  : '☐ ${event.label}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

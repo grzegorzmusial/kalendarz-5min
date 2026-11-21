@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import 'calendar.dart';
+import 'time_fields.dart';
 
 class EventEditor extends StatefulWidget {
   const EventEditor({
@@ -68,20 +69,6 @@ class _EventEditorState extends State<EventEditor> {
     super.dispose();
   }
 
-  void _setDuration(int minutes) {
-    setState(() {
-      _duration.text = '$minutes';
-      _durationChanged = true;
-    });
-  }
-
-  void _stepDuration(int direction) {
-    final minutes = _minutes ?? slotMinutes;
-    final gridIndex = minutes / slotMinutes;
-    final next = direction > 0 ? gridIndex.floor() + 1 : gridIndex.ceil() - 1;
-    _setDuration((next * slotMinutes).clamp(slotMinutes, 5256000));
-  }
-
   Future<void> _save() async {
     if (_saving || !_form.currentState!.validate()) return;
     final end = _end!;
@@ -116,23 +103,7 @@ class _EventEditorState extends State<EventEditor> {
   @override
   Widget build(BuildContext context) {
     final day = dateOnly(_start);
-    final slots = List.generate(
-      dayMinutes(day) ~/ slotMinutes,
-      (index) => day.add(Duration(minutes: index * slotMinutes)),
-    );
-    if (widget.event != null &&
-        !widget.event!.allDay &&
-        !slots.contains(widget.event!.start)) {
-      slots.add(widget.event!.start);
-      slots.sort();
-    }
-    final end = _end;
     final localizations = MaterialLocalizations.of(context);
-    final endLabel = end == null
-        ? null
-        : dateOnly(end) == day
-        ? slotLabel(day, end)
-        : '${localizations.formatShortDate(end)}, ${clock(end)}';
     return PopScope(
       canPop: !_saving,
       child: AlertDialog(
@@ -172,77 +143,15 @@ class _EventEditorState extends State<EventEditor> {
                       : null,
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<DateTime>(
-                  initialValue: _start,
-                  decoration: const InputDecoration(
-                    labelText: 'Godzina rozpoczęcia',
-                  ),
-                  menuMaxHeight: 340,
-                  items: [
-                    for (final slot in slots)
-                      DropdownMenuItem(
-                        value: slot,
-                        child: Text(slotLabel(day, slot)),
-                      ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _start = value!),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _duration,
-                        enabled: !_saving,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Czas trwania (min)',
-                        ),
-                        onChanged: (_) =>
-                            setState(() => _durationChanged = true),
-                        validator: (_) {
-                          final minutes = _minutes;
-                          if (minutes == null || _end == null) {
-                            return 'Podaj czas';
-                          }
-                          if (_durationChanged && minutes % slotMinutes != 0) {
-                            return 'Wpisz wielokrotność 5';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Skróć o 5 minut',
-                      onPressed: _saving || (_minutes ?? 0) <= slotMinutes
-                          ? null
-                          : () => _stepDuration(-1),
-                      icon: const Icon(Icons.remove),
-                    ),
-                    IconButton(
-                      tooltip: 'Wydłuż o 5 minut',
-                      onPressed: _saving ? null : () => _stepDuration(1),
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: _saving
-                          ? null
-                          : () => _setDuration(slotMinutes),
-                      child: const Text('Ustaw 5 min'),
-                    ),
-                    if (endLabel != null) Text('Koniec o $endLabel'),
-                  ],
+                TimeFields(
+                  start: _start,
+                  end: _end,
+                  duration: _duration,
+                  enabled: !_saving,
+                  allowOriginalDuration: !_durationChanged,
+                  onStartChanged: (value) => setState(() => _start = value),
+                  onDurationChanged: () =>
+                      setState(() => _durationChanged = true),
                 ),
                 if (widget.event == null && widget.calendars.isNotEmpty) ...[
                   const SizedBox(height: 8),

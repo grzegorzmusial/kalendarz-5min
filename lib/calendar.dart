@@ -67,6 +67,8 @@ class CalendarEvent {
     this.recurring = false,
     this.canModify = true,
     this.color,
+    this.taskId,
+    this.taskListId,
   });
 
   factory CalendarEvent.fromRow(Map<Object?, Object?> row) {
@@ -92,6 +94,9 @@ class CalendarEvent {
   final bool recurring;
   final bool canModify;
   final int? color;
+  final String? taskId;
+  final String? taskListId;
+  Object get identity => taskId == null ? (id, start) : (taskListId, taskId);
 
   CalendarEvent withTimes(DateTime start, DateTime end) => CalendarEvent(
     id: id,
@@ -103,6 +108,8 @@ class CalendarEvent {
     recurring: recurring,
     canModify: canModify,
     color: color,
+    taskId: taskId,
+    taskListId: taskListId,
   );
 
   String get label => title.trim().isEmpty ? 'Bez tytułu' : title;
