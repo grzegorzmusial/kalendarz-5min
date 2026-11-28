@@ -159,6 +159,22 @@ class CalendarStore {
   Future<void> setTaskClientId(String clientId) =>
       _channel.invokeMethod<void>('setTaskClientId', {'clientId': clientId});
 
+  Future<({String id, String email})?> taskAccount() async {
+    final account = await _channel.invokeMapMethod<String, String>(
+      'taskAccount',
+    );
+    final id = account?['id'];
+    final email = account?['email'];
+    if (id == null || email == null || id.isEmpty || email.isEmpty) return null;
+    return (id: id, email: email);
+  }
+
+  Future<void> setTaskAccount(String id, String email) =>
+      _channel.invokeMethod<void>('setTaskAccount', {'id': id, 'email': email});
+
+  Future<void> clearTaskAccount() =>
+      _channel.invokeMethod<void>('clearTaskAccount');
+
   Future<void> setDefaultCalendar(int calendarId) => _channel
       .invokeMethod<void>('setDefaultCalendar', {'calendarId': calendarId});
 

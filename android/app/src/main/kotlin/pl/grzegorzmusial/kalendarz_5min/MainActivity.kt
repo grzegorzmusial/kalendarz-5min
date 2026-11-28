@@ -45,6 +45,25 @@ class MainActivity : FlutterActivity() {
                     reply.success(hasPermission())
                 }
                 "requestPermission" -> requestAccess(reply)
+                "taskAccount" -> {
+                    val preferences = getSharedPreferences("calendar_settings", MODE_PRIVATE)
+                    val id = preferences.getString("tasks_account_id", null)
+                    val email = preferences.getString("tasks_account_email", null)
+                    reply.success(if (id == null || email == null) null else mapOf("id" to id, "email" to email))
+                }
+                "setTaskAccount", "clearTaskAccount" -> worker.execute {
+                    val editor = getSharedPreferences("calendar_settings", MODE_PRIVATE).edit()
+                    if (call.method == "clearTaskAccount") {
+                        editor.remove("tasks_account_id").remove("tasks_account_email")
+                    } else {
+                        editor.putString("tasks_account_id", call.argument<String>("id"))
+                            .putString("tasks_account_email", call.argument<String>("email"))
+                    }
+                    val saved = editor.commit()
+                    runOnUiThread {
+                        if (saved) reply.success(null) else reply.error("settings", null, null)
+                    }
+                }
                 "taskClientId" -> reply.success(
                     getSharedPreferences("calendar_settings", MODE_PRIVATE)
                         .getString("tasks_client_id", "")

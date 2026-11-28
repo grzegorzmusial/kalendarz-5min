@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart'
+    as platform;
 import 'package:http/http.dart' as http;
 
 import 'calendar.dart';
@@ -14,14 +16,15 @@ class TasksFailure implements Exception {
 }
 
 class TasksAuth {
-  TasksAuth._();
-  static final instance = TasksAuth._();
+  TasksAuth();
+  static final instance = TasksAuth();
   static const scopes = ['https://www.googleapis.com/auth/tasks'];
   final _signIn = GoogleSignIn.instance;
   Future<void>? _initialization;
   String? _initializedClientId;
   GoogleSignInAccount? _account;
-  String? get email => _account?.email;
+  String? _savedEmail;
+  String? get email => _account?.email ?? _savedEmail;
 
   Future<void> _initialize() async {
     final clientId = (await CalendarStore().taskClientId()).trim();
@@ -42,19 +45,32 @@ class TasksAuth {
 
   Future<void> connect() async {
     await _initialize();
-    _account = await _signIn.authenticate(scopeHint: scopes);
-    await _account!.authorizationClient.authorizeScopes(scopes);
+    final account = await _signIn.authenticate(scopeHint: scopes);
+    await account.authorizationClient.authorizeScopes(scopes);
+    await CalendarStore().setTaskAccount(account.id, account.email);
+    _account = account;
+    _savedEmail = account.email;
   }
 
   Future<String> token() async {
-    await _initialize();
-    _account ??= await _signIn.attemptLightweightAuthentication();
-    final account = _account;
+    final account = await CalendarStore().taskAccount();
     if (account == null) {
       throw const TasksFailure('Połącz konto Google, aby wyświetlić zadania.');
     }
-    final authorization = await account.authorizationClient
-        .authorizationForScopes(scopes);
+    _savedEmail = account.email;
+    await _initialize();
+    // Restore API authorization without invoking Credential Manager's sign-in UI.
+    final authorization = await platform.GoogleSignInPlatform.instance
+        .clientAuthorizationTokensForScopes(
+          platform.ClientAuthorizationTokensForScopesParameters(
+            request: platform.AuthorizationRequestDetails(
+              scopes: scopes,
+              userId: account.id,
+              email: account.email,
+              promptIfUnauthorized: false,
+            ),
+          ),
+        );
     if (authorization == null) {
       throw const TasksFailure(
         'Połącz konto Google i zezwól na dostęp do zadań.',
@@ -64,9 +80,11 @@ class TasksAuth {
   }
 
   Future<void> disconnect() async {
+    await CalendarStore().clearTaskAccount();
+    _account = null;
+    _savedEmail = null;
     await _initialize();
     await _signIn.signOut();
-    _account = null;
   }
 }
 

@@ -28,7 +28,7 @@ Gotowy pakiet znajduje się w `build/app/outputs/flutter-apk/app-release.apk`. L
 
 ## Domyślny kalendarz i Zadania Google
 
-Dołączony APK ma wbudowany identyfikator klienta OAuth z pliku config/google_tasks.json. Google Tasks API, klienci Android i Web oraz zakres dostępu są skonfigurowane w projekcie My First Project (project-22e2e5bd-3a7c-48f9-bc1). Aplikacja jest w trybie testowym z kontem grzegorz.musial.1980@gmail.com dodanym jako użytkownik testowy. W aplikacji wybierz „Połącz konto Google”, aby nadać dostęp do zadań.
+Dołączony APK ma wbudowany identyfikator klienta OAuth z pliku config/google_tasks.json. Google Tasks API, klienci Android i Web oraz zakres dostępu są skonfigurowane w projekcie My First Project (project-22e2e5bd-3a7c-48f9-bc1). Aplikacja jest w trybie testowym z kontem grzegorz.musial.1980@gmail.com dodanym jako użytkownik testowy. W aplikacji wybierz „Połącz konto Google”, aby nadać dostęp do zadań. Konto jest zapamiętywane. Przy starcie aplikacja sprawdza dostęp do zadań bez otwierania okna logowania. Po aktualizacji z wersji 1.2.0 lub starszej połącz konto raz przyciskiem, aby zapisać wybór konta.
 
 Kalendarz 5 min — Zadania Google
 
